@@ -1,0 +1,94 @@
+//
+//  InvoiceView.swift
+//  damus
+//
+//  Created by William Casarin on 2022-10-18.
+//
+
+import SwiftUI
+
+func open_with_wallet(wallet: Wallet.Model, invoice: String) {
+    if let url = URL(string: "\(wallet.link)\(invoice)"), UIApplication.shared.canOpenURL(url) {
+        UIApplication.shared.open(url)
+    } else {
+        guard let store_link = wallet.appStoreLink else {
+            // TODO: do something here if we don't have an appstore link
+            return
+        }
+        
+        guard let url = URL(string: store_link) else {
+            return
+        }
+        
+        guard UIApplication.shared.canOpenURL(url) else {
+            return
+        }
+        
+        UIApplication.shared.open(url)
+    }
+}
+
+struct InvoiceView: View {
+    @Environment(\.colorScheme) var colorScheme
+    @Environment(\.openURL) private var openURL
+    let our_pubkey: String
+    let invoice: Invoice
+    @State var showing_select_wallet: Bool = false
+    
+    var PayButton: some View {
+        Button {
+            if should_show_wallet_selector(our_pubkey) {
+                showing_select_wallet = true
+            } else {
+                open_with_wallet(wallet: get_default_wallet(our_pubkey).model, invoice: invoice.string)
+            }
+        } label: {
+            RoundedRectangle(cornerRadius: 20)
+                .foregroundColor(colorScheme == .light ? .black : .white)
+                .overlay {
+                    Text("Pay", comment: "Button to pay a Lightning invoice.")
+                        .fontWeight(.medium)
+                        .foregroundColor(colorScheme == .light ? .white : .black)
+                }
+        }
+        //.buttonStyle(.bordered)
+        .onTapGesture {
+            // Temporary solution so that the "pay" button can be clicked (Yes we need an empty tap gesture)
+        }
+    }
+    
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 10)
+                .foregroundColor(.secondary.opacity(0.1))
+            
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Label("", systemImage: "bolt.fill")
+                        .foregroundColor(.orange)
+                    Text("Lightning Invoice", comment: "Indicates that the view is for paying a Lightning invoice.")
+                }
+                Divider()
+                Text(invoice.description_string)
+                Text(invoice.amount.amount_sats_str())
+                    .font(.title)
+                PayButton
+                    .frame(height: 50)
+                    .zIndex(10.0)
+            }
+            .padding(30)
+        }
+        .sheet(isPresented: $showing_select_wallet, onDismiss: {showing_select_wallet = false}) {
+            SelectWalletView(showingSelectWallet: $showing_select_wallet, our_pubkey: our_pubkey, invoice: invoice.string)
+        }
+    }
+}
+
+let test_invoice = Invoice(description: .description("this is a description"), amount: .specific(10000), string: "lnbc100n1p357sl0sp5t9n56wdztun39lgdqlr30xqwksg3k69q4q2rkr52aplujw0esn0qpp5mrqgljk62z20q4nvgr6lzcyn6fhylzccwdvu4k77apg3zmrkujjqdpzw35xjueqd9ejqcfqv3jhxcmjd9c8g6t0dcxqyjw5qcqpjrzjqt56h4gvp5yx36u2uzqa6qwcsk3e2duunfxppzj9vhypc3wfe2wswz607uqq3xqqqsqqqqqqqqqqqlqqyg9qyysgqagx5h20aeulj3gdwx3kxs8u9f4mcakdkwuakasamm9562ffyr9en8yg20lg0ygnr9zpwp68524kmda0t5xp2wytex35pu8hapyjajxqpsql29r", expiry: 604800, payment_hash: Data(), created_at: 1666139119)
+
+struct InvoiceView_Previews: PreviewProvider {
+    static var previews: some View {
+        InvoiceView(our_pubkey: "", invoice: test_invoice)
+            .frame(width: 200, height: 200)
+    }
+}
